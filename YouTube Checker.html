@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Channel Videos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #121212; /* Dark background */
+            color: #fff; /* Light text color */
+        }
+
+        h3 {
+            margin-bottom: 5px;
+            margin-top: 0px;
+            color: #e0e0e0; /* Lighter text color for headings */
+        }
+
+        p {
+            margin-top: 0px;
+            color: #c7c7c7; /* Slightly dimmed text color */
+        }
+
+        #video-list {
+            width: 80%;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #1e1e1e; /* Darker background for the video list */
+            border: 1px solid #333; /* Dark border color */
+            box-shadow: 2px 2px 5px rgba(255,255,255,0.1); /* Lighter shadow for contrast */
+        }
+
+        .video-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .video-thumbnail {
+            flex-shrink: 0;
+            margin-right: 15px;
+        }
+
+        .video-thumbnail img {
+            width: 180px;
+            height: auto;
+        }
+
+        .video-details {
+            flex-grow: 1;
+        }
+
+        .channel-title {
+            font-size: 1.4em;
+            text-decoration: underline;
+            margin-top: 0px;
+            margin-bottom: 7px;
+            color: #e0e0e0; /* Lighter text color for channel titles */
+        }
+
+        a {
+            color: #4fc3f7; /* Light blue color for links */
+        }
+
+        a:hover {
+            color: #29b6f6; /* Slightly lighter blue for hover effect */
+        }
+    </style>
+</head>
+<body>
+    <div id="video-list">Loading videos...</div>
+    <script>
+        const API_KEY = '';
+        const CHANNEL_IDS = ['UCXuqSBlHAE6Xw-yeJA0Tunw', // Linus Tech Tips
+            'UCOUZWV1DRtHtpP2H48S7iiw', // Psychology in Seattle
+            'UCB_qr75-ydFVKSF9Dmo6izg' // Formula 1
+            ];
+
+        function fetchChannelDetails(channelId) {
+            const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${API_KEY}`;
+
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const channel = data.items[0];
+                    return { channelId: channel.id, channelName: channel.snippet.title };
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function fetchVideos(channelDetails) {
+            const url = `https://www.googleapis.com/youtube/v3/search?order=date&part=snippet&channelId=${channelDetails.channelId}&maxResults=10&key=${API_KEY}`;
+            
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const videosWithChannel = data.items.map(item => {
+                        item.snippet.channelName = channelDetails.channelName;
+                        return item;
+                    });
+                    return videosWithChannel;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function formatPublishDate(dateString) {
+            const publishDate = new Date(dateString);
+            const now = new Date();
+            const differenceInMinutes = Math.floor((now - publishDate) / 60000); // 60000 milliseconds in a minute
+
+            if (differenceInMinutes < 60) {
+                return `${differenceInMinutes} minutes ago`;
+            }
+            const differenceInHours = Math.floor(differenceInMinutes / 60);
+            if (differenceInHours < 24) {
+                return `${differenceInHours} hours ago`;
+            }
+            const differenceInDays = Math.floor(differenceInHours / 24);
+            return `${differenceInDays} days ago`;
+        }
+
+        Promise.all(CHANNEL_IDS.map(fetchChannelDetails))
+            .then(channelDetailsArray => Promise.all(channelDetailsArray.map(fetchVideos)))
+            .then(results => {
+                const allVideos = results.flat(); // Combine videos from all channels
+
+                // Sort videos by publish date
+                allVideos.sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+
+                displayVideos(allVideos);
+            });
+
+        function displayVideos(videos) {
+            const videoList = document.getElementById('video-list');
+            videoList.innerHTML = videos.map(video => {
+                const videoId = video.id.videoId;
+                const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                const thumbnailUrl = video.snippet.thumbnails.medium.url; // or use 'high' or 'default'
+                const channelUrl = `https://www.youtube.com/channel/${video.snippet.channelId}/videos`;
+
+                return `<div class="video-item">
+                            <div class="video-thumbnail">
+                                <a href="${videoUrl}" target="_blank">
+                                    <img src="${thumbnailUrl}" alt="Thumbnail">
+                                </a>
+                            </div>
+                            <div class="video-details">
+                                <h3><a href="${videoUrl}" target="_blank">${video.snippet.title}</a></h3>
+                                <p class="channel-title"><a href="${channelUrl}" target="_blank">${video.snippet.channelName}</a></p>
+                                <p>Published: ${formatPublishDate(video.snippet.publishedAt)}</p>
+                            </div>
+                        </div>`;
+            }).join('');
+        }
+
+        CHANNEL_IDS.forEach(channelId => {
+            fetchVideos(channelId);
+        });
+
+    </script>
+</body>
+</html>
